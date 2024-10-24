@@ -2,3 +2,4 @@ migrations/
 venv/
 profile_pics/
 db.sqlite3
+media/
