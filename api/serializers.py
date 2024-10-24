@@ -51,15 +51,18 @@ class RegisterSerializer(serializers.ModelSerializer):
         return user
 
 
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = [
+            "phone_number",
+            "address",
+            "date_of_birth",
+        ]
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
-    phone_number = serializers.CharField(source="profile.phone_number", required=False)
-    profile_picture = serializers.ImageField(
-        source="profile.profile_picture", required=False
-    )
-    address = serializers.CharField(source="profile.address", required=False)
-    date_of_birth = serializers.DateField(
-        source="profile.date_of_birth", required=False
-    )
+    profile = ProfileSerializer()
 
     class Meta:
         model = User
@@ -69,10 +72,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "date_joined",
-            "phone_number",
-            "date_of_birth",
-            "profile_picture",
-            "address",
+            "profile",
         ]
         read_only_fields = ["email", "username", "date_joined"]
 
