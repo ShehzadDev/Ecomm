@@ -1,5 +1,21 @@
 from rest_framework import serializers
-from .models import User, UserProfile
+from .models import (
+    User,
+    UserProfile,
+    Category,
+    Product,
+    ProductVariant,
+    Cart,
+    CartItem,
+    Order,
+    OrderItem,
+    Payment,
+    ShippingAddress,
+    Review,
+    Wishlist,
+    Coupon,
+    Tag,
+)
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -54,11 +70,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = [
-            "phone_number",
-            "address",
-            "date_of_birth",
-        ]
+        fields = ["phone_number", "address", "date_of_birth", "profile_picture"]
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -91,3 +103,195 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
         profile.save()
         return instance
+
+
+class CategorySerializer(serializers.ModelSerializer):
+    subcategories = serializers.StringRelatedField(many=True, read_only=True)
+
+    class Meta:
+        model = Category
+        fields = ["id", "name", "slug", "description", "parent", "subcategories"]
+
+
+class TagSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Tag
+        fields = ["id", "name"]
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    category = CategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(), source="category", write_only=True
+    )
+    tags = TagSerializer(many=True, read_only=True)
+    tags_id = serializers.PrimaryKeyRelatedField(
+        queryset=Tag.objects.all(), many=True, source="tags", write_only=True
+    )
+
+    class Meta:
+        model = Product
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "description",
+            "price",
+            "discount_price",
+            "category",
+            "category_id",
+            "tags",
+            "tags_id",
+            "inventory_count",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class ProductVariantSerializer(serializers.ModelSerializer):
+    product = ProductSerializer(read_only=True)
+    product_id = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(), source="product", write_only=True
+    )
+
+    class Meta:
+        model = ProductVariant
+        fields = [
+            "id",
+            "product",
+            "product_id",
+            "variant_name",
+            "variant_value",
+            "price",
+            "stock_count",
+        ]
+
+
+class CartItemSerializer(serializers.ModelSerializer):
+    cart = serializers.PrimaryKeyRelatedField(
+        queryset=Cart.objects.all(), write_only=True
+    )
+    product_variant = ProductVariantSerializer(read_only=True)
+    product_variant_id = serializers.PrimaryKeyRelatedField(
+        queryset=ProductVariant.objects.all(), source="product_variant", write_only=True
+    )
+
+    class Meta:
+        model = CartItem
+        fields = [
+            "id",
+            "cart",
+            "product_variant",
+            "product_variant_id",
+            "quantity",
+            "price_at_time",
+        ]
+
+
+class CartSerializer(serializers.ModelSerializer):
+    items = CartItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Cart
+        fields = ["id", "user", "created_at", "updated_at", "items"]
+
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    product_variant = ProductVariantSerializer(read_only=True)
+    product_variant_id = serializers.PrimaryKeyRelatedField(
+        queryset=ProductVariant.objects.all(), source="product_variant", write_only=True
+    )
+
+    class Meta:
+        model = OrderItem
+        fields = [
+            "id",
+            "order",
+            "product_variant",
+            "product_variant_id",
+            "quantity",
+            "price_at_time",
+        ]
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    order_items = serializers.ReadOnlyField()
+    items = OrderItemSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Order
+        fields = [
+            "id",
+            "user",
+            "order_status",
+            "payment_status",
+            "total_amount",
+            "created_at",
+            "updated_at",
+            "items",
+            "order_items",
+        ]
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Payment
+        fields = [
+            "id",
+            "order",
+            "payment_method",
+            "amount",
+            "payment_status",
+            "payment_date",
+        ]
+
+
+class ShippingAddressSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShippingAddress
+        fields = [
+            "id",
+            "user",
+            "address_line1",
+            "address_line2",
+            "city",
+            "state",
+            "postal_code",
+            "country",
+            "phone_number",
+        ]
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField(read_only=True)
+
+    class Meta:
+        model = Review
+        fields = [
+            "id",
+            "product",
+            "user",
+            "rating",
+            "comment",
+            "created_at",
+            "updated_at",
+        ]
+
+    def create(self, validated_data):
+        validated_data["user"] = self.context["request"].user
+        return super().create(validated_data)
+
+
+class WishlistSerializer(serializers.ModelSerializer):
+    products = ProductSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Wishlist
+        fields = ["id", "user", "products"]
+
+
+class CouponSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Coupon
+        fields = ["id", "code", "discount_amount", "is_active", "expiration_date"]
