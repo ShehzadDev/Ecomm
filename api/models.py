@@ -5,6 +5,7 @@ from django.contrib.auth.models import (
     PermissionsMixin,
 )
 from .enums import OrderStatus, PaymentStatus, PaymentMethod
+from django.utils import timezone
 
 
 class UserManager(BaseUserManager):
@@ -129,6 +130,16 @@ class CartItem(models.Model):
         return f"Color: {self.product_variant.variant_value} x {self.quantity} in cart"
 
 
+class Coupon(models.Model):
+    code = models.CharField(max_length=50, unique=True)
+    discount_amount = models.DecimalField(max_digits=5, decimal_places=2)
+    is_active = models.BooleanField(default=True)
+    expiration_date = models.DateField()
+
+    def __str__(self):
+        return f"Coupon {self.code}".strip()
+
+
 class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
     order_status = models.CharField(
@@ -140,11 +151,28 @@ class Order(models.Model):
         default=PaymentStatus.PENDING.value,
     )
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    coupon = models.OneToOneField(
+        Coupon, on_delete=models.SET_NULL, null=True, blank=True, related_name="orders"
+    )
+    discounted_amount = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Order {self.id} by {self.user.username}"
+
+    def apply_coupon(self, coupon):
+        if not coupon.is_active or coupon.expiration_date < timezone.now().date():
+            return "Invalid coupon."
+
+        self.coupon = coupon
+        self.discounted_amount = self.total_amount - coupon.discount_amount
+
+        self.discounted_amount = max(self.discounted_amount, 0)
+        self.save()
+        return self.discounted_amount
 
     @property
     def order_items(self):
@@ -212,16 +240,6 @@ class Wishlist(models.Model):
 
     def __str__(self):
         return f"Wishlist of {self.user.username}"
-
-
-class Coupon(models.Model):
-    code = models.CharField(max_length=50, unique=True)
-    discount_amount = models.DecimalField(max_digits=5, decimal_places=2)
-    is_active = models.BooleanField(default=True)
-    expiration_date = models.DateField()
-
-    def __str__(self):
-        return f"Coupon {self.code}".strip()
 
 
 class Tag(models.Model):

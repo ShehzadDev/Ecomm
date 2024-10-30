@@ -7,7 +7,7 @@ from .serializers import *
 from .models import *
 from rest_framework import filters
 from .enums import OrderStatus, PaymentStatus, PaymentMethod
-from rest_framework.pagination import PageNumberPagination
+from .pagination import CustomPagination
 from django.utils import timezone
 
 
@@ -34,7 +34,6 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
 class CategoryViewSet(viewsets.ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    paginator = None
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
@@ -45,6 +44,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    pagination_class = CustomPagination
 
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ["category", "is_active", "price"]
@@ -82,6 +82,22 @@ class ProductViewSet(viewsets.ModelViewSet):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=True, methods=["get"], url_path="reviews")
+    def reviews(self, request, pk=None):
+        product = self.get_object()
+        reviews = Review.objects.filter(product=product)
+        serializer = ReviewSerializer(reviews, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="add-reviews")
+    def add_review(self, request, pk=None):
+        product = self.get_object()
+        serializer = ReviewSerializer(data=request.data, context={"request": request})
+        if serializer.is_valid(raise_exception=True):
+            serializer.save(product=product, user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ProductVariantViewSet(viewsets.ModelViewSet):
     queryset = ProductVariant.objects.all()
@@ -93,7 +109,6 @@ class CartViewSet(viewsets.ModelViewSet):
     queryset = Cart.objects.all()
     serializer_class = CartSerializer
     permission_classes = [IsAuthenticated]
-    paginator = None
 
     def get_queryset(self):
         return self.queryset.filter(user=self.request.user)
@@ -111,14 +126,12 @@ class CartViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"], url_path="add-item")
     def add_item(self, request, pk=None):
-        item_id = request.data.get("item_id")
-        cart = self.queryset.filter(id=pk, user=request.user).first()
-
-        if not cart:
+        try:
+            cart = Cart.objects.get(id=pk, user=request.user)
+            message = "Item added to existing cart."
+        except Cart.DoesNotExist:
             cart = Cart.objects.create(user=request.user)
             message = "New cart created and item added."
-        else:
-            message = "Item added to existing cart."
 
         serializer = CartItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -169,7 +182,6 @@ class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = [IsAuthenticated]
-    paginator = None
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user)
@@ -233,7 +245,6 @@ class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
-    paginator = None
 
     def create(self, request, *args, **kwargs):
         order_id = request.data.get("order")
@@ -280,7 +291,6 @@ class ShippingAddressViewSet(viewsets.ModelViewSet):
     queryset = ShippingAddress.objects.all()
     serializer_class = ShippingAddressSerializer
     permission_classes = [IsAuthenticated]
-    paginator = None
 
     def get_queryset(self):
         return self.queryset.filter(user=self.request.user)
@@ -324,3 +334,120 @@ class ShippingAddressViewSet(viewsets.ModelViewSet):
                 {"detail": "Shipping address not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+
+class ReviewsViewSet(viewsets.ModelViewSet):
+    queryset = Review.objects.all()
+    serializer_class = ReviewSerializer
+    permission_classes = [IsAdminUser]
+
+
+class WishlistViewSet(viewsets.ModelViewSet):
+    queryset = Wishlist.objects.all()
+    serializer_class = WishlistSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.action in ["list", "add", "remove"]:
+            return [IsAuthenticated()]
+        return [IsAdminUser()]
+
+    def get_queryset(self):
+        return self.queryset.filter(user=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def add(self, request, pk=None):
+        product_id = request.data.get("product_id")
+
+        try:
+            product = Product.objects.get(id=product_id)
+
+            wishlist = Wishlist.objects.get(pk=pk, user=request.user)
+
+            wishlist.products.add(product)
+            wishlist.save()
+
+            return Response(
+                {"message": "Product added to wishlist."},
+                status=status.HTTP_201_CREATED,
+            )
+        except Product.DoesNotExist:
+            return Response(
+                {"error": "Product not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Wishlist.DoesNotExist:
+            wishlist = Wishlist.objects.create(user=request.user)
+            wishlist.products.add(product)
+            wishlist.save()
+
+            return Response(
+                {"message": "New wishlist created and product added."},
+                status=status.HTTP_201_CREATED,
+            )
+
+    @action(detail=True, methods=["delete"])
+    def remove(self, request, pk=None):
+        product_id = request.data.get("product_id")
+
+        try:
+            product = Product.objects.get(id=product_id)
+            wishlist = Wishlist.objects.get(id=pk, user=request.user)
+            wishlist.products.remove(product)
+            wishlist.save()
+            return Response(
+                {"message": "Product removed from wishlist."},
+                status=status.HTTP_204_NO_CONTENT,
+            )
+        except Product.DoesNotExist:
+            return Response(
+                {"error": "Product not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Wishlist.DoesNotExist:
+            return Response(
+                {"error": "Wishlist not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+
+class CouponViewSet(viewsets.ModelViewSet):
+    queryset = Coupon.objects.all()
+    serializer_class = CouponSerializer
+
+    def get_permissions(self):
+        if self.action in ["list", "create", "update", "destroy"]:
+            return [IsAdminUser()]
+        return [IsAuthenticated()]
+
+    # @action(detail=True, methods=["post"])
+    # def apply(self, request, pk=None):
+    #     coupon = self.get_object()
+    #     order_id = request.data.get("order_id")
+    #     try:
+    #         order = Order.objects.get(id=order_id)
+    #         order.apply_coupon(coupon)
+    #         order.save()
+    #         return Response(
+    #             {
+    #                 "message": "Coupon applied successfully.",
+    #                 "order": OrderSerializer(order).data,
+    #             },
+    #             status=status.HTTP_200_OK,
+    #         )
+    #     except Order.DoesNotExist:
+    #         return Response(
+    #             {"error": "Order not found."},
+    #             status=status.HTTP_404_NOT_FOUND,
+    #         )
+    #     except Coupon.DoesNotExist:
+    #         return Response(
+    #             {"error": "Coupon not found."},
+    #             status=status.HTTP_404_NOT_FOUND,
+    #         )
+
+
+class TagViewSet(viewsets.ModelViewSet):
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = [IsAdminUser]

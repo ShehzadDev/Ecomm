@@ -9,6 +9,10 @@ from .views import (
     OrderViewSet,
     PaymentViewSet,
     ShippingAddressViewSet,
+    ReviewsViewSet,
+    WishlistViewSet,
+    CouponViewSet,
+    TagViewSet,
 )
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import (
@@ -26,6 +30,10 @@ router.register("carts", CartViewSet, basename="cart")
 router.register("orders", OrderViewSet, basename="order")
 router.register("payments", PaymentViewSet, basename="payment")
 router.register("addresses", ShippingAddressViewSet, basename="address")
+router.register("reviews", ReviewsViewSet, basename="review")
+router.register("wishlists", WishlistViewSet, basename="wishlist")
+router.register("coupons", CouponViewSet, basename="coupon")
+router.register("tags", TagViewSet, basename="tag")
 
 
 urlpatterns = [
