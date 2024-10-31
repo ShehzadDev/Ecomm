@@ -9,7 +9,11 @@ from rest_framework import filters
 from .enums import OrderStatus, PaymentStatus, PaymentMethod
 from .pagination import CustomPagination
 from django.utils import timezone
-from django.db.utils import IntegrityError
+from sesame.utils import get_query_string, get_user
+from django.contrib.auth import get_user_model
+
+
+User = get_user_model()
 
 
 class RegisterAPIView(APIView):
@@ -18,10 +22,48 @@ class RegisterAPIView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(
-            {"message": "User registered successfully."}, status=status.HTTP_201_CREATED
+        user = serializer.save()
+
+        verification_token = get_query_string(user)
+        verification_link = request.build_absolute_uri(
+            f"/api/users/verify/{verification_token}"
         )
+
+        return Response(
+            {
+                "message": "User registered successfully.",
+                "verification_link": verification_link,
+                "token": verification_token,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class UserVerificationView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request, *args, **kwargs):
+        token = request.GET.get("sesame")
+
+        if not token:
+            return Response(
+                {"error": "Token is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = get_user(token)
+        if user:
+            user.is_active = True
+            user.save()
+            return Response(
+                {"message": "Your account has been verified."},
+                status=status.HTTP_200_OK,
+            )
+        else:
+            return Response(
+                {"error": "Invalid token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -272,11 +314,6 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Response(
                 {"error": "Coupon not found."},
                 status=status.HTTP_404_NOT_FOUND,
-            )
-        except IntegrityError:
-            return Response(
-                {"error": "This coupon is already applied to the order."},
-                status=status.HTTP_400_BAD_REQUEST,
             )
 
 

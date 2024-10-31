@@ -42,8 +42,13 @@ INSTALLED_APPS = [
     "api",
     "rest_framework_simplejwt",
     "django_filters",
-    # "anymail",
 ]
+
+SESAME_COOKIE_NAME = "sesame"
+SESAME_COOKIE_AGE = 60 * 60 * 24 * 7
+SESAME_USE_HTTP_ONLY = True
+SESAME_USE_SECURE = True
+SESAME_TIMEOUT = 60 * 60 * 24
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -53,6 +58,11 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "sesame.backends.ModelBackend",
 ]
 
 ROOT_URLCONF = "Ecommerce.urls"

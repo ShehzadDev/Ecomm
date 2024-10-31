@@ -1,6 +1,7 @@
 from django.urls import path, include
 from .views import (
     RegisterAPIView,
+    UserVerificationView,
     UserProfileView,
     CategoryViewSet,
     ProductViewSet,
@@ -38,6 +39,7 @@ router.register("tags", TagViewSet, basename="tag")
 
 urlpatterns = [
     path("api/users/register/", RegisterAPIView.as_view(), name="register"),
+    path("api/users/verify/", UserVerificationView.as_view(), name="user_verify"),
     path("api/users/login/", TokenObtainPairView.as_view(), name="login"),
     path("api/users/profile/", UserProfileView.as_view(), name="profile"),
     path("api/users/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
