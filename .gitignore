@@ -1,3 +1,4 @@
+.env
 migrations/
 venv/
 profile_pics/

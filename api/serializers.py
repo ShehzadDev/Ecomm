@@ -169,9 +169,6 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 
 class CartItemSerializer(serializers.ModelSerializer):
-    cart = serializers.PrimaryKeyRelatedField(
-        queryset=Cart.objects.all(), write_only=True
-    )
     product_variant = ProductVariantSerializer(read_only=True)
     product_variant_id = serializers.PrimaryKeyRelatedField(
         queryset=ProductVariant.objects.all(), source="product_variant", write_only=True
@@ -181,7 +178,6 @@ class CartItemSerializer(serializers.ModelSerializer):
         model = CartItem
         fields = [
             "id",
-            "cart",
             "product_variant",
             "product_variant_id",
             "quantity",
@@ -227,6 +223,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "order_status",
             "payment_status",
             "total_amount",
+            "discounted_amount",
             "created_at",
             "updated_at",
             "items",

@@ -9,6 +9,7 @@ from rest_framework import filters
 from .enums import OrderStatus, PaymentStatus, PaymentMethod
 from .pagination import CustomPagination
 from django.utils import timezone
+from django.db.utils import IntegrityError
 
 
 class RegisterAPIView(APIView):
@@ -124,14 +125,14 @@ class CartViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(cart)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=["post"], url_path="add-item")
-    def add_item(self, request, pk=None):
-        try:
-            cart = Cart.objects.get(id=pk, user=request.user)
-            message = "Item added to existing cart."
-        except Cart.DoesNotExist:
-            cart = Cart.objects.create(user=request.user)
-            message = "New cart created and item added."
+    @action(detail=False, methods=["post"], url_path="add-item")
+    def add_item(self, request):
+        cart, created = Cart.objects.get_or_create(user=request.user)
+        message = (
+            "New cart created and item added."
+            if created
+            else "Item added to existing cart."
+        )
 
         serializer = CartItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -139,8 +140,8 @@ class CartViewSet(viewsets.ModelViewSet):
 
         return Response({"message": message}, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=["put"], url_path="update")
-    def update_item(self, request, pk=None):
+    @action(detail=False, methods=["put"], url_path="update")
+    def update_item(self, request):
         item_id = request.data.get("item_id")
 
         try:
@@ -159,8 +160,8 @@ class CartViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-    @action(detail=True, methods=["delete"], url_path="remove")
-    def remove_item(self, request, pk=None):
+    @action(detail=False, methods=["delete"], url_path="remove")
+    def remove_item(self, request):
         item_id = request.data.get("item_id")
 
         try:
@@ -188,7 +189,7 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="create")
     def create_order(self, request):
-        cart = Cart.objects.filter(user=request.user).first()
+        cart, created = Cart.objects.get_or_create(user=request.user)
 
         if not cart or not cart.items.exists():
             return Response(
@@ -207,16 +208,18 @@ class OrderViewSet(viewsets.ModelViewSet):
             payment_status=PaymentStatus.PENDING.value,
         )
 
+        order_items = []
         for cart_item in cart.items.all():
-            OrderItem.objects.create(
-                order=order,
-                product_variant=cart_item.product_variant,
-                quantity=cart_item.quantity,
-                price_at_time=cart_item.price_at_time,
+            order_items.append(
+                OrderItem(
+                    order=order,
+                    product_variant=cart_item.product_variant,
+                    quantity=cart_item.quantity,
+                    price_at_time=cart_item.price_at_time,
+                )
             )
-
+            OrderItem.objects.bulk_create(order_items)
             cart.items.all().delete()
-            cart.delete()
         return Response(OrderSerializer(order).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["put"], url_path="cancel")
@@ -240,11 +243,50 @@ class OrderViewSet(viewsets.ModelViewSet):
         serializer = OrderItemSerializer(items, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=["post"], url_path="apply")
+    def apply(self, request, pk=None):
+        coupon_id = request.data.get("coupon")
+
+        try:
+            coupon = Coupon.objects.get(id=coupon_id)
+            order = Order.objects.get(id=pk, user=request.user)
+
+            order.apply_coupon(coupon)
+            message = "Coupon applied successfully."
+
+            order.save()
+
+            return Response(
+                {
+                    "message": message,
+                    "order": OrderSerializer(order).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+        except Order.DoesNotExist:
+            return Response(
+                {"error": "Order not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Coupon.DoesNotExist:
+            return Response(
+                {"error": "Coupon not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except IntegrityError:
+            return Response(
+                {"error": "This coupon is already applied to the order."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
 
 class PaymentViewSet(viewsets.ModelViewSet):
     queryset = Payment.objects.all()
     serializer_class = PaymentSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return self.queryset.filter(order__user=self.request.user)
 
     def create(self, request, *args, **kwargs):
         order_id = request.data.get("order")
@@ -355,14 +397,13 @@ class WishlistViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return self.queryset.filter(user=self.request.user)
 
-    @action(detail=True, methods=["post"])
-    def add(self, request, pk=None):
+    @action(detail=False, methods=["post"])
+    def add(self, request):
         product_id = request.data.get("product_id")
 
         try:
             product = Product.objects.get(id=product_id)
-
-            wishlist = Wishlist.objects.get(pk=pk, user=request.user)
+            wishlist, created = Wishlist.objects.get_or_create(user=request.user)
 
             wishlist.products.add(product)
             wishlist.save()
@@ -386,13 +427,13 @@ class WishlistViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_201_CREATED,
             )
 
-    @action(detail=True, methods=["delete"])
-    def remove(self, request, pk=None):
+    @action(detail=False, methods=["delete"])
+    def remove(self, request):
         product_id = request.data.get("product_id")
 
         try:
             product = Product.objects.get(id=product_id)
-            wishlist = Wishlist.objects.get(id=pk, user=request.user)
+            wishlist = Wishlist.objects.get(user=request.user)
             wishlist.products.remove(product)
             wishlist.save()
             return Response(
@@ -419,32 +460,6 @@ class CouponViewSet(viewsets.ModelViewSet):
         if self.action in ["list", "create", "update", "destroy"]:
             return [IsAdminUser()]
         return [IsAuthenticated()]
-
-    # @action(detail=True, methods=["post"])
-    # def apply(self, request, pk=None):
-    #     coupon = self.get_object()
-    #     order_id = request.data.get("order_id")
-    #     try:
-    #         order = Order.objects.get(id=order_id)
-    #         order.apply_coupon(coupon)
-    #         order.save()
-    #         return Response(
-    #             {
-    #                 "message": "Coupon applied successfully.",
-    #                 "order": OrderSerializer(order).data,
-    #             },
-    #             status=status.HTTP_200_OK,
-    #         )
-    #     except Order.DoesNotExist:
-    #         return Response(
-    #             {"error": "Order not found."},
-    #             status=status.HTTP_404_NOT_FOUND,
-    #         )
-    #     except Coupon.DoesNotExist:
-    #         return Response(
-    #             {"error": "Coupon not found."},
-    #             status=status.HTTP_404_NOT_FOUND,
-    #         )
 
 
 class TagViewSet(viewsets.ModelViewSet):

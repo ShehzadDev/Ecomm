@@ -112,7 +112,7 @@ class ProductVariant(models.Model):
 
 
 class Cart(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="carts")
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="cart")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -140,8 +140,31 @@ class Coupon(models.Model):
         return f"Coupon {self.code}".strip()
 
 
+class ShippingAddress(models.Model):
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="shipping_addresses"
+    )
+    address_line1 = models.CharField(max_length=255)
+    address_line2 = models.CharField(max_length=255, blank=True, null=True)
+    city = models.CharField(max_length=100)
+    state = models.CharField(max_length=100)
+    postal_code = models.CharField(max_length=20)
+    country = models.CharField(max_length=100)
+    phone_number = models.CharField(max_length=15)
+
+    def __str__(self):
+        return f"Shipping Address for {self.user.username}"
+
+
 class Order(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
+    address = models.OneToOneField(
+        ShippingAddress,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="order",
+    )
     order_status = models.CharField(
         max_length=10, choices=OrderStatus.choices(), default=OrderStatus.PENDING.value
     )
@@ -164,15 +187,12 @@ class Order(models.Model):
         return f"Order {self.id} by {self.user.username}"
 
     def apply_coupon(self, coupon):
-        if not coupon.is_active or coupon.expiration_date < timezone.now().date():
-            return "Invalid coupon."
-
-        self.coupon = coupon
-        self.discounted_amount = self.total_amount - coupon.discount_amount
-
-        self.discounted_amount = max(self.discounted_amount, 0)
-        self.save()
-        return self.discounted_amount
+        if coupon.is_active and coupon.expiration_date >= timezone.now().date():
+            discount = min(self.total_amount, coupon.discount_amount)
+            self.discounted_amount = self.total_amount - discount
+            self.coupon = coupon
+        else:
+            raise ValueError("Invalid or expired coupon")
 
     @property
     def order_items(self):
@@ -204,22 +224,6 @@ class Payment(models.Model):
         return f"Payment {self.id} for Order {self.order.id}"
 
 
-class ShippingAddress(models.Model):
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="shipping_addresses"
-    )
-    address_line1 = models.CharField(max_length=255)
-    address_line2 = models.CharField(max_length=255, blank=True, null=True)
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20)
-    country = models.CharField(max_length=100)
-    phone_number = models.CharField(max_length=15)
-
-    def __str__(self):
-        return f"Shipping Address for {self.user.username}"
-
-
 class Review(models.Model):
     product = models.ForeignKey(
         Product, on_delete=models.CASCADE, related_name="reviews"
@@ -235,7 +239,7 @@ class Review(models.Model):
 
 
 class Wishlist(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="wishlists")
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="wishlist")
     products = models.ManyToManyField(Product, related_name="wishlisted_by")
 
     def __str__(self):
