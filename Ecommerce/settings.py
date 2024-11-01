@@ -12,6 +12,11 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-@dcnd9na^a$!pd-@6hmb^ndu7w2+cm^+1yovw852)40db4mpi&"
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -42,13 +47,9 @@ INSTALLED_APPS = [
     "api",
     "rest_framework_simplejwt",
     "django_filters",
+    "sesame",
 ]
 
-SESAME_COOKIE_NAME = "sesame"
-SESAME_COOKIE_AGE = 60 * 60 * 24 * 7
-SESAME_USE_HTTP_ONLY = True
-SESAME_USE_SECURE = True
-SESAME_TIMEOUT = 60 * 60 * 24
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -64,6 +65,19 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
     "sesame.backends.ModelBackend",
 ]
+
+SESAME_MAX_AGE = 86400
+
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.sendgrid.net"
+EMAIL_HOST_USER = "apikey"
+EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
+EMAIL_USE_TLS = True
+EMAIL_PORT = 587
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
+
 
 ROOT_URLCONF = "Ecommerce.urls"
 

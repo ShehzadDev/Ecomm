@@ -20,6 +20,7 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+from sesame.views import LoginView
 
 
 router = DefaultRouter()
@@ -39,7 +40,7 @@ router.register("tags", TagViewSet, basename="tag")
 
 urlpatterns = [
     path("api/users/register/", RegisterAPIView.as_view(), name="register"),
-    path("api/users/verify/", UserVerificationView.as_view(), name="user_verify"),
+    path("api/users/verify/", UserVerificationView.as_view(), name="verify"),
     path("api/users/login/", TokenObtainPairView.as_view(), name="login"),
     path("api/users/profile/", UserProfileView.as_view(), name="profile"),
     path("api/users/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),

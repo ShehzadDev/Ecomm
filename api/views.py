@@ -13,7 +13,8 @@ from sesame.utils import get_query_string, get_user
 from django.contrib.auth import get_user_model
 
 
-User = get_user_model()
+from django.core.mail import send_mail
+from django.conf import settings
 
 
 class RegisterAPIView(APIView):
@@ -29,11 +30,18 @@ class RegisterAPIView(APIView):
             f"/api/users/verify/{verification_token}"
         )
 
+        send_mail(
+            subject="Verify your account",
+            message=f"Hi {user.username}, please verify your account by clicking the link: {verification_link}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+
         return Response(
             {
-                "message": "User registered successfully.",
+                "message": "User registered successfully. Please check your email to verify your account.",
                 "verification_link": verification_link,
-                "token": verification_token,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -52,6 +60,7 @@ class UserVerificationView(APIView):
             )
 
         user = get_user(token)
+        print(user)
         if user:
             user.is_active = True
             user.save()
