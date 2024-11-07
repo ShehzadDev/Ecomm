@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+      - celery
+
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+  celery:
+    build: .
+    command: celery -A Ecommerce worker -n worker1@%h --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - db
+      - flower
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6380:6379"
+
+  flower:
+    image: mher/flower
+    command: celery flower
+    env_file:
+      - .env
+    ports:
+      - "5555:5555"
+
+volumes:
+  postgres_data:

@@ -1,25 +1,7 @@
 from django.urls import path, include
-from .views import (
-    RegisterAPIView,
-    UserVerificationView,
-    UserProfileView,
-    CategoryViewSet,
-    ProductViewSet,
-    ProductVariantViewSet,
-    CartViewSet,
-    OrderViewSet,
-    PaymentViewSet,
-    ShippingAddressViewSet,
-    ReviewsViewSet,
-    WishlistViewSet,
-    CouponViewSet,
-    TagViewSet,
-)
+from .views import *
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import (
-    TokenObtainPairView,
-    TokenRefreshView,
-)
+from rest_framework_simplejwt.views import *
 from sesame.views import LoginView
 
 

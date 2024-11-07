@@ -9,8 +9,7 @@ from rest_framework import filters
 from .enums import OrderStatus, PaymentStatus, PaymentMethod
 from .pagination import CustomPagination
 from django.utils import timezone
-from sesame.utils import get_query_string, get_user
-from django.contrib.auth import get_user_model
+from sesame.utils import get_query_string, get_user, authenticate
 
 
 from django.core.mail import send_mail
@@ -30,13 +29,13 @@ class RegisterAPIView(APIView):
             f"/api/users/verify/{verification_token}"
         )
 
-        send_mail(
-            subject="Verify your account",
-            message=f"Hi {user.username}, please verify your account by clicking the link: {verification_link}",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
+        # send_mail(
+        #     subject="Verify your account",
+        #     message=f"Hi {user.username}, please verify your account by clicking the link: {verification_link}",
+        #     from_email=settings.DEFAULT_FROM_EMAIL,
+        #     recipient_list=[user.email],
+        #     fail_silently=False,
+        # )
 
         return Response(
             {
@@ -59,7 +58,7 @@ class UserVerificationView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        user = get_user(token)
+        user = authenticate(request, sesame=token)
         print(user)
         if user:
             user.is_active = True

@@ -1,21 +1,5 @@
 from rest_framework import serializers
-from .models import (
-    User,
-    UserProfile,
-    Category,
-    Product,
-    ProductVariant,
-    Cart,
-    CartItem,
-    Order,
-    OrderItem,
-    Payment,
-    ShippingAddress,
-    Review,
-    Wishlist,
-    Coupon,
-    Tag,
-)
+from .models import *
 
 
 class RegisterSerializer(serializers.ModelSerializer):
