@@ -48,8 +48,11 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "django_filters",
     "sesame",
+    "django_celery_beat",
 ]
 
+
+CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

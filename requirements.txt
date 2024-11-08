@@ -1,5 +1,6 @@
 amqp==5.2.0
 asgiref==3.8.1
+async-timeout==5.0.1
 billiard==4.2.1
 celery==5.4.0
 certifi==2024.8.30
@@ -8,14 +9,17 @@ click==8.1.7
 click-didyoumean==0.3.1
 click-plugins==1.1.1
 click-repl==0.3.0
+cron-descriptor==1.4.5
 Django==5.1.2
 django-anymail==12.0
+django-celery-beat==2.7.0
 django-environ==0.11.2
 django-filter==24.3
 django-ipware==7.0.1
 django-rest-authemail==2.1.7
 django-sendgrid-v5==1.2.3
 django-sesame==3.2.2
+django-timezone-field==7.0
 djangorestframework==3.15.2
 djangorestframework-simplejwt==5.3.1
 idna==3.10
@@ -25,10 +29,12 @@ prompt_toolkit==3.0.48
 psycopg2==2.9.10
 psycopg2-binary==2.9.10
 PyJWT==2.9.0
+python-crontab==3.2.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-http-client==3.3.7
 python-ipware==3.0.0
+redis==5.2.0
 requests==2.32.3
 sendgrid==6.11.0
 six==1.16.0
@@ -39,5 +45,3 @@ tzdata==2024.2
 urllib3==2.2.3
 vine==5.1.0
 wcwidth==0.2.13
-redis>=4.0.0
-

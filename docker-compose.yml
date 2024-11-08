@@ -12,6 +12,7 @@ services:
       - db
       - redis
       - celery
+      - celery-beat
 
   db:
     image: postgres:13
@@ -32,7 +33,16 @@ services:
     depends_on:
       - redis
       - db
-      - flower
+
+  celery-beat:
+    build: .
+    command: celery -A Ecommerce beat --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - db
+      - celery
 
   redis:
     image: redis:latest
